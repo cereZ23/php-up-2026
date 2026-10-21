@@ -1,0 +1,48 @@
+# Suricata IDS rules — PHP session.upload_progress UAF
+# Presumed CVE-2026-109618 / CVE-2026-109619
+# Author: Andrea Ceresoni  (sticky-buffer syntax: Suricata 6/7; NOT Snort2)
+#
+# Operational notes:
+#  - http.request_body is inspected only up to `request-body-limit`
+#    (default 4096 bytes) in suricata.yaml. The PHP_SESSION_UPLOAD_PROGRESS
+#    field must be the FIRST multipart field to take effect in PHP, so it
+#    falls within that window; a binary heap-groom payload may not.
+#  - Validate before deploy:  suricata -T -S detections/php_upload_progress.rules
+#  - SIDs use the local range 1000000-1999999; renumber to fit your ruleset.
+
+# --- Rule 1: practical / production -----------------------------------------
+# Detects the trigger field in a multipart POST. Will also fire on legitimate
+# apps that use session.upload_progress -> treat as medium, tune per environment.
+alert http any any -> $HOME_NET $HTTP_PORTS ( \
+    msg:"PHP session.upload_progress trigger field in multipart POST (CVE-2026-109618/CVE-2026-109619)"; \
+    flow:to_server,established; \
+    http.method; content:"POST"; \
+    http.content_type; content:"multipart/form-data"; nocase; \
+    http.request_body; \
+        content:"Content-Disposition|3a|"; nocase; \
+        content:"name=|22|PHP_SESSION_UPLOAD_PROGRESS|22|"; nocase; distance:0; fast_pattern; \
+    reference:cve,2026-109618; \
+    reference:cve,2026-109619; \
+    classtype:web-application-attack; \
+    metadata:author Andrea_Ceresoni, created_at 2026_10_21, severity medium, tag PHP_UAF, tag Exploit_Attempt; \
+    sid:1000001; rev:1; )
+
+# --- Rule 2: experimental / high-confidence ---------------------------------
+# Adds the array-spray field (t[]) and a groomed qword. Far fewer false
+# positives, but PoC-specific: a changed groom value or a payload past the
+# request-body-limit will evade it. Keep alongside Rule 1, not instead of it.
+alert http any any -> $HOME_NET $HTTP_PORTS ( \
+    msg:"EXPLOIT PHP session.upload_progress UAF heap grooming attempt (CVE-2026-109618/CVE-2026-109619)"; \
+    flow:to_server,established; \
+    http.method; content:"POST"; \
+    http.content_type; content:"multipart/form-data"; nocase; \
+    http.request_body; \
+        content:"PHP_SESSION_UPLOAD_PROGRESS"; nocase; fast_pattern; \
+        pcre:"/name\s*=\s*[\"']?PHP_SESSION_UPLOAD_PROGRESS[\"']?/i"; \
+        pcre:"/name\s*=\s*[\"']?t\[\][\"']?/i"; \
+        content:"|40 00 00 00 00 00 00 00|"; \
+    reference:cve,2026-109618; \
+    reference:cve,2026-109619; \
+    classtype:attempted-admin; \
+    metadata:author Andrea_Ceresoni, created_at 2026_10_21, confidence medium, tag PHP_UAF, tag Exploit_Attempt; \
+    sid:1000002; rev:2; )
