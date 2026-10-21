@@ -20,3 +20,8 @@ Credits:
   assist:         A.T.L.A.S
 
 Authorized defensive-research / scoped-engagement use only.
+
+Detections (defensive, Sigma):
+  detections/shell-spawned-by-php-worker-linux.yml
+  detections/shell-spawned-by-php-worker-windows.yml
+  detections/cve-2026-109618-109619-upload-progress-trigger.yml

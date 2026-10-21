@@ -1,0 +1,61 @@
+title: Shell Or Suspicious Tool Spawned By PHP Or Web Worker (Windows)
+id: 7e6f2a10-4c8b-4d33-9a2e-1f0c5b7a9d44
+status: experimental
+description: >
+    Detects shells, interpreters and living-off-the-land binaries started
+    directly by PHP runtimes or web server workers on Windows (IIS, Apache,
+    nginx). May indicate command execution following exploitation of a PHP
+    worker. Not CVE-specific.
+references:
+    - https://jackalsyn.com/posts/php-up-2026.html
+author: Andrea Ceresoni
+date: 2026/10/21
+tags:
+    - attack.execution
+    - attack.t1059.001
+    - attack.t1059.003
+    - attack.t1505.003
+logsource:
+    product: windows
+    category: process_creation
+detection:
+    selection_parent:
+        ParentImage|endswith:
+            - '\php-cgi.exe'
+            - '\php.exe'
+            - '\httpd.exe'
+            - '\nginx.exe'
+            - '\w3wp.exe'        # IIS application pool worker
+            - '\php-fpm.exe'
+            - '\frankenphp.exe'
+    selection_child:
+        Image|endswith:
+            - '\cmd.exe'
+            - '\powershell.exe'
+            - '\pwsh.exe'
+            - '\wscript.exe'
+            - '\cscript.exe'
+            - '\mshta.exe'
+            - '\rundll32.exe'
+            - '\regsvr32.exe'
+            - '\bitsadmin.exe'
+            - '\certutil.exe'
+            - '\curl.exe'
+            - '\net.exe'
+            - '\net1.exe'
+            - '\whoami.exe'
+            - '\hostname.exe'
+            - '\ipconfig.exe'
+            - '\systeminfo.exe'
+            - '\schtasks.exe'
+            - '\reg.exe'
+            - '\wmic.exe'
+            - '\bash.exe'
+            - '\wsl.exe'
+            - '\python.exe'
+    condition: selection_parent and selection_child
+falsepositives:
+    - Applications legitimately shelling out to utilities
+    - Deployment or health-check scripts invoked by the app pool
+    - Authorized administration and security testing
+level: medium
